@@ -10,6 +10,7 @@ typedef struct {
 
 struct NColor {
     int r, g, b, a;
+    float fr, fg, fb, fa;
     unsigned char *cdata;
     NColor(int r, int g, int b, int a = 255) {
         cdata = (unsigned char *)malloc(4 * sizeof(char));
@@ -17,6 +18,11 @@ struct NColor {
         cdata[1] = this->g = g;
         cdata[2] = this->b = b;
         cdata[3] = this->a = a;
+
+        fr = r / 255.0;
+        fg = g / 255.0;
+        fb = b / 255.0;
+        fa = a / 255.0;
     }
 };
 
@@ -30,7 +36,7 @@ private:
     int projLoc, viewLoc;
 } Shader;
 
-typedef class {
+class NPrimitive {
 public:
     void init(float posx, float posy, float width, float height);
     void draw();
@@ -39,38 +45,34 @@ public:
     void updatePositions(float posx0, float posy0, float posx1, float posy1);
     void getCoords(float *posx, float *posy, float *width, float *height);
     void updateColor(NColor color);
+    void updateColorVertices(NColor color0, NColor color1, NColor color2, NColor color3);
+    void updateRadius(float radius);
+    void updateRadiuses(float radius0, float radius1, float radius2, float radius3);
+    bool mouseIsOver();
 
+    NPrimitive *parent = NULL;
     NBounds bounds;
-private:
     Shader *shader;
-    unsigned int VAO, VBO;
+    unsigned int VAO, VBO, EBO;
     float posx, posy;
     float width, height;
-    void generateBuffers();
-    void bindBuffers();
-    void setBuffers();
-    void setVertexAttributes();
-} NRectangle;
 
-typedef class {
-public:
-    void init(float posx, float posy, float width, float height);
-    void draw();
-    void updateCoords(float posx, float posy, float width, float height);
-    void blit(int offsetx, int offsety, int width, int height, unsigned char *data);
-    void setShader(Shader *shader);
-private:
     void generateBuffers();
     void bindBuffers();
     void setBuffers();
     void setVertexAttributes();
-    void bindTexture();
-    Shader *shader;
-    unsigned int VBO, VAO, EBO;
+};
+
+class NRectangle : public NPrimitive {
+};
+
+class NImage : public NPrimitive{
+public:
+    void createImage();
+    void blit(int posX, int posY, int width, int height, unsigned char *data);
+private:
     unsigned int texture;
-    float posx, posy;
-    float width, height;
-} NImage;
+};
 
 void neptune_init();
 void neptune_start();

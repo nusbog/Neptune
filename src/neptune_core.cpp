@@ -17,8 +17,8 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
 // Settings
-float scr_width  = 800.0;
-float scr_height = 600.0;
+float scr_width  = 1200.0;
+float scr_height = 800.0;
 float scrollSpeed = 1.0;
 
 GLFWwindow* window;
@@ -32,8 +32,11 @@ void (*onPaint)();
 void (*onScroll)(int dir);
 void (*onClick)(int button, int action);
 
+double mousePosX;
+double mousePosY;
+
 void neptune_updateProjectionMatrix() {
-    proj = glm::ortho(-scr_width, scr_width, -scr_height, scr_height, 0.1f, 100.0f);
+    proj = glm::ortho(0.0f, scr_width, 0.0f, scr_height, 0.1f, 100.0f);
 }
 
 void setZoom(float zoomAmount) {
@@ -47,7 +50,8 @@ void neptune_getScreenSize(float *_scr_width, float *_scr_height) {
 }
 
 void neptune_getMousePosition(double *x, double *y) {
-    glfwGetCursorPos(window, x, y);
+    *x = mousePosX;
+    *y = mousePosY;
 }
 
 void neptune_onPaintCallback(void (*_onPaint)()) {
@@ -119,6 +123,7 @@ void Shader::getShaderUniformLocations() {
 }
 
 void Shader::pushMatricesToShader() {
+    glUseProgram(program);
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
 }
@@ -159,7 +164,6 @@ Shader loadShaderFromMemory(const char *vShaderCode, const char *fShaderCode) {
     createShader(&shader.fShader, fShaderCode, GL_FRAGMENT_SHADER);
     createShaderProgram(&shader);
 
-
     glDeleteShader(shader.vShader);
     glDeleteShader(shader.fShader);
 
@@ -178,36 +182,66 @@ Shader neptune_loadShader(char *vShaderPath, char *fShaderPath) {
     return shader;
 }
 
-// NRECTANGLE
-void NRectangle::setVertexAttributes() {
+// NPrimitive
+void NPrimitive::setVertexAttributes() {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(12 * sizeof(float)));
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(8 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)(24 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)(32 * sizeof(float)));
+    glEnableVertexAttribArray(3);
+
+    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, 1 * sizeof(float), (void*)(40 * sizeof(float)));
+    glEnableVertexAttribArray(4);
 }
 
-void NRectangle::bindBuffers() {
+void NPrimitive::bindBuffers() {
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 }
 
-void NRectangle::setBuffers() {
+void NPrimitive::setBuffers() {
     float vertices[] = {
-         posx + width, posy + height, // top right
-         posx + width, posy         , // bottom right
-         posx        , posy         , // bottom left
+        // Vertex Positions
+        posx + width, posy + height, // top right
+        posx + width, posy         , // bottom right
+        posx        , posy         , // bottom left
+        posx        , posy + height, // top left 
 
-         posx        , posy + height, // top left 
-         posx        , posy         , // bottom left
-         posx + width, posy + height, // top right
+        // Vertex Colors
+        1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 1.0,
 
-         1.0, 1.0, 1.0, 1.0,
-         1.0, 1.0, 1.0, 1.0,
-         1.0, 1.0, 1.0, 1.0,
-         1.0, 1.0, 1.0, 1.0,
-         1.0, 1.0, 1.0, 1.0,
-         1.0, 1.0, 1.0, 1.0,
+        // Texture Coordinates
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f,
+        0.0f, 0.0f,
+
+        // Dimensions
+        width, height,
+        width, height,
+        width, height,
+        width, height,
+
+        // Radiuses
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    };
+
+    int indices[] = {
+        0, 1, 2,
+        0, 2, 3,
     };
 
     this->bounds = (NBounds){ 
@@ -217,14 +251,16 @@ void NRectangle::setBuffers() {
         posx + width, posy };
 
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 }
 
-void NRectangle::generateBuffers() {
+void NPrimitive::generateBuffers() {
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
 }
 
-void NRectangle::init(float posx, float posy, float width, float height) {
+void NPrimitive::init(float posx, float posy, float width, float height) {
     this->posx = posx;
     this->posy = posy;
     this->width = width;
@@ -237,53 +273,100 @@ void NRectangle::init(float posx, float posy, float width, float height) {
     setVertexAttributes();
 }
 
-void NRectangle::setShader(Shader *shader) {
-    this->shader = shader;}
-
-void NRectangle::draw() {
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-    glUseProgram(shader->program);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+void NPrimitive::setShader(Shader *shader) {
+    this->shader = shader;
 }
 
-void NRectangle::updateColor(NColor color) {
+void NPrimitive::draw() {
+    bindBuffers();
+
+    if(parent != NULL) {
+        float vertices[] = {
+            parent->posx + posx + width, parent->posy + posy + height, // top right
+            parent->posx + posx + width, parent->posy + posy         , // bottom right
+            parent->posx + posx        , parent->posy + posy         , // bottom left
+            parent->posx + posx        , parent->posy + posy + height, // top left 
+        };
+
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+    }
+
+    glUseProgram(shader->program);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+}
+
+void NPrimitive::updateColor(NColor color) {
+    bindBuffers();
+
     float r, g, b, a;
-    r = color.r / 255.0;
-    g = color.g / 255.0;
-    b = color.b / 255.0;
-    a = color.a / 255.0;
+    r = color.fr;
+    g = color.fg;
+    b = color.fb;
+    a = color.fa;
 
     float colors[] = {
         r, g, b, a,
         r, g, b, a,
         r, g, b, a,
         r, g, b, a,
-        r, g, b, a,
-        r, g, b, a,
     };
 
-    glBufferSubData(GL_ARRAY_BUFFER, 12 * sizeof(float), sizeof(colors), colors);
+    glBufferSubData(GL_ARRAY_BUFFER, 8 * sizeof(float), sizeof(colors), colors);
 }
 
-void NRectangle::updatePositions(float posx0, float posy0, float posx1, float posy1) {
+void NPrimitive::updateColorVertices(NColor color0, NColor color1, NColor color2, NColor color3) {
+    bindBuffers();
+
+    float colors[] = {
+        color0.fr, color0.fg, color0.fb, color0.fa,
+        color1.fr, color1.fg, color1.fb, color1.fa,
+        color2.fr, color2.fg, color2.fb, color2.fa,
+        color3.fr, color3.fg, color3.fb, color3.fa,
+    };
+
+    glBufferSubData(GL_ARRAY_BUFFER, 8 * sizeof(float), sizeof(colors), colors);
+}
+
+void NPrimitive::updateRadius(float radius) {
+    bindBuffers();
+
+    float radiuses[] = {
+        radius,
+        radius,
+        radius,
+        radius,
+    };
+
+    glBufferSubData(GL_ARRAY_BUFFER, 40 * sizeof(float), sizeof(radiuses), radiuses);
+}
+
+void NPrimitive::updateRadiuses(float radius0, float radius1, float radius2, float radius3) {
+    bindBuffers();
+
+    float radiuses[] = {
+        radius0,
+        radius1,
+        radius2,
+        radius3,
+    };
+
+    glBufferSubData(GL_ARRAY_BUFFER, 40 * sizeof(float), sizeof(radiuses), radiuses);
+}
+
+void NPrimitive::updatePositions(float posx0, float posy0, float posx1, float posy1) {
     bindBuffers();
 
     float vertices[] = {
         posx1, posy1, // top right
         posx1, posy0, // bottom right
         posx0, posy0, // bottom left
-
         posx0, posy1, // top left 
-        posx0, posy0, // bottom left
-        posx1, posy1, // top right
     };
 
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
 }
 
-void NRectangle::updateCoords(float posx, float posy, float width, float height) {
+void NPrimitive::updateCoords(float posx, float posy, float width, float height) {
     bindBuffers();
 
     this->posx = posx;
@@ -295,16 +378,27 @@ void NRectangle::updateCoords(float posx, float posy, float width, float height)
         posx + width, posy + height, // top right
         posx + width, posy         , // bottom right
         posx        , posy         , // bottom left
-
         posx        , posy + height, // top left 
-        posx        , posy         , // bottom left
-        posx + width, posy + height, // top right
     };
 
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
 }
 
-void NRectangle::getCoords(float *posx, float *posy, float *width, float *height) {
+bool NPrimitive::mouseIsOver() {
+    bool isOver = false;
+
+    float transformedPosY = scr_height - posy;
+
+    if(mousePosX > posx && mousePosX < posx + width) {
+        if(mousePosY < transformedPosY && mousePosY > transformedPosY - height) {
+            isOver = true;
+        }
+    }
+
+    return isOver;
+}
+
+void NPrimitive::getCoords(float *posx, float *posy, float *width, float *height) {
     *posx = this->posx;
     *posy = this->posy;
     *width = this->width;
@@ -312,47 +406,12 @@ void NRectangle::getCoords(float *posx, float *posy, float *width, float *height
 }
 
 // NIMAGE
-void NImage::generateBuffers() {
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+void NImage::createImage() {
+    bindBuffers();
+
     glGenTextures(1, &texture);
-}
+    glBindTexture(GL_TEXTURE_2D, texture);
 
-void NImage::bindBuffers() {
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-}
-
-void NImage::setBuffers() {
-    float vertices[] = {
-         posx + width, posy + height, 1.0f, 0.0f, // top right
-         posx + width, posy         , 1.0f, 1.0f, // bottom right
-         posx        , posy         , 0.0f, 1.0f, // bottom left
-         posx        , posy + height, 0.0f, 0.0f, // top left 
-    };
-
-    unsigned int indices[] = {  
-        0, 1, 3, // first triangle
-        1, 2, 3  // second triangle
-    };
-
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-}
-
-void NImage::setVertexAttributes() {
-    // position attribute
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    // texture coord attribute
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-}
-
-void NImage::bindTexture() {
-    glBindTexture(GL_TEXTURE_2D, texture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
     // set the texture wrapping parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
@@ -360,61 +419,33 @@ void NImage::bindTexture() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    int datasize = width * height * 4;
-    unsigned int w, h;
+    int datasize = 32 * 32 * 4;
+    // unsigned int w, h;
     unsigned char *data = (unsigned char *)calloc(datasize, datasize);
 
     // Texture Loading
     //int success = lodepng_decode32_file(&data, &w, &h, "idle.png");
     // TODO: Resize, ändra width & height
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
+
+    free(data);
 }
 
-void NImage::blit(int offsetx, int offsety, int width, int height, unsigned char *data) {
+void NImage::blit(int posX, int posY, int width, int height, unsigned char *data) {
     bindBuffers();
-    glTexSubImage2D(GL_TEXTURE_2D, 0, offsetx, offsety, width, height, GL_RGBA, GL_UNSIGNED_BYTE, (void*)data);
-}
-
-void NImage::updateCoords(float posx, float posy, float width, float height) {
-    this->posx = posx;
-    this->posy = posy;
-    this->width = width;
-    this->height = height;
-
-    bindBuffers();
-    setBuffers();
-}
-
-void NImage::init(float posx, float posy, float width, float height) {
-    this->posx = posx;
-    this->posy = posy;
-    this->width = width;
-    this->height = height;
-
-    generateBuffers();
-    bindBuffers();
-    setBuffers();
-    setVertexAttributes();
-    bindTexture();
-}
-
-void NImage::setShader(Shader *shader) {
-    this->shader = shader;
-}
-
-void NImage::draw() {
     glBindTexture(GL_TEXTURE_2D, texture);
-    glUseProgram(shader->program);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+    glTexSubImage2D(GL_TEXTURE_2D, 0, posX, posY, width, height, GL_RGBA, GL_UNSIGNED_BYTE, (void*)data);
 }
 
 void renderLoop() {
+    // glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+
     while (!glfwWindowShouldClose(window))
     {
+        glfwGetCursorPos(window, &mousePosX, &mousePosY);
 
         processInput(window);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -432,8 +463,7 @@ void neptune_init()
 {
     setupGLFW();
     setupGlad();
-
-    glClearColor(45.0 / 255.0, 50.0 / 255.0, 80.0 / 255.0, 1.0f);
+    glClearColor(32.0 / 255.0, 31.0 / 255.0, 40.0 / 255.0, 1.0f);
 
     neptune_updateProjectionMatrix();
     setZoom(-4.0);
@@ -463,7 +493,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     scr_width  = width;
     scr_height = height;
-
     glViewport(0, 0, width, height);
     neptune_updateProjectionMatrix();
 }
